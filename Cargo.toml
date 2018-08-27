@@ -1,7 +1,13 @@
 [package]
 name = "grad"
 version = "0.1.0"
+repository = "https://github.com/geal/grad"
+description = "aggregate, store, query and visualize your metrics, all in one tool"
+license = "AGPL-3.0-or-later"
 authors = ["Geoffroy Couprie <contact@geoffroycouprie.com>"]
+readme = "README.md"
+categories = ["database-implementations", "visualization"]
+keywords = ["metrics", "statsd", "graph", "chart"]
 
 [dependencies]
 nom = "^4.0"
