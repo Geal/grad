@@ -1,0 +1,60 @@
+{
+  "title": "sozu",
+  "graphs": [
+    {
+      "id": "requests",
+      "title": "HTTP requests",
+      "series": [
+        "sozu.http.requests",
+        "sozu.http.status.2xx",
+        "sozu.http.status.3xx",
+        "sozu.http.status.4xx",
+        "sozu.http.status.5xx"
+      ]
+    },
+    {
+      "id": "protocols",
+      "title": "Protocols",
+      "series": [
+        "sozu.protocol.http",
+        "sozu.protocol.https",
+        "sozu.protocol.tls_handshake"
+      ]
+    },
+    {
+      "id": "TLS",
+      "title": "TLS versions and ciphers",
+      "series": [
+        "sozu.tls.version.TLSv1_1",
+        "sozu.tls.version.TLSv1_2",
+        "sozu.tls.version.TLSv1_3",
+        "sozu.tls.cipher.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+        "sozu.tls.cipher.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256",
+        "sozu.tls.cipher.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+        "sozu.tls.cipher.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+        "sozu.tls.cipher.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA25.",
+        "sozu.tls.cipher.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+        "sozu.tls.cipher.TLS13_CHACHA20_POLY1305_SHA256",
+        "sozu.tls.cipher.TLS13_AES_256_GCM_SHA384",
+        "sozu.tls.cipher.TLS13_AES_128_GCM_SHA256"
+      ]
+    },
+    {
+      "id": "buffers",
+      "title": "Buffers and slabs",
+      "series": [
+        "sozu.buffer.count",
+        "sozu.slab.count"
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "Client / backend active connections",
+      "series": [
+        "sozu.client.connections",
+        "sozu.backend.connections",
+        "sozu.http_active_requests"
+      ]
+    }
+  ]
+}
