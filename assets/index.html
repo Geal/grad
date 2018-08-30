@@ -43,11 +43,18 @@
     return chart;
   }
 
-  function load_data(chart, key, index, since) {
-    $.getJSON("/data/"+key, { since: since }, function(data) {
+  function load_data(chart, query, index) {
+    return $.ajax({
+      type: "POST",
+      url: "data",
+      data: JSON.stringify(query),
+      dataType: "json",
+      contentType: "application/json"
+    }).then(function(data) {
 
       var dataLength = data.timestamps.length;
       var should_update = false;
+      console.log("loading data for "+query.key);
       for(var i = 0; i < dataLength; i++) {
         if (typeof data.timestamps[i] !== 'undefined' &&
           typeof data.values[i] !== 'undefined') {
@@ -59,23 +66,30 @@
           });
         }
       }
-
-      if (should_update) {
-        chart.update({ duration: 0 });
-      }
-
-    })
+    });
   }
 
-  function create_graph(id, name, keys) {
+  function create_graph(id, name, series) {
     $('body').append("<div><h2>"+name+"</h2><canvas id='"+id+"'></canvas></div>");
     var chart = create_chart(id, name);
+    chart.update({ duration: 0 });
     var index = 0;
-    var since = moment().subtract(3, 'hours').unix();
-    keys.forEach(function(key) {
+    var length = series.length;
+    var requests = [];
+    console.log("creating graph: "+name);
+    for (var index = 0; index < length; index++) {
+      if( !series[index].hasOwnProperty('range') ) {
+        series[index].range = {};
+      }
+      if(!series[index].range.hasOwnProperty('since')) {
+        series[index].range.since = moment().subtract(3, 'hours').unix();
+      } else {
+        series[index].range.since = moment(serie.range.since).unix();
+      }
+
       if(typeof chart.data.datasets[index] === 'undefined') {
         chart.data.datasets[index] = {
-          label: key,
+          label: series[index].key,
           fill: false,
           pointRadius: 0,
           lineTension: 0,
@@ -86,20 +100,34 @@
         };
       }
 
-      load_data(chart, key, index, since);
-      index = index + 1;
-    });
+      console.log(name+": starting request for "+series[index].key);
+      var since = moment().unix();
+      requests.push(load_data(chart, series[index], index));
+      series[index].range.since = since;
+    }
 
-    since = moment().unix();
+    console.log(name+": all requests started, resolving");
+    $.when.apply($, requests).always(function() {
+      console.log(name+": all requests done, updating chart");
+      chart.update({ duration: 0 });
+    })
+
 
     setInterval(function () {
-      var index = 0;
-      keys.forEach(function(key) {
-        load_data(chart, key, index, since);
-        index = index + 1;
-      });
-      since = moment().unix();
-    }, 30000);
+      var length = series.length;
+      var reqs = [];
+      for (var index = 0; index < length; index++) {
+        console.log(name+": starting update request for "+series[index].key+", since = ", series[index].range.since);
+        var since = moment().unix();
+        reqs.push(load_data(chart, series[index], index));
+        series[index].range.since = since;
+      }
+      console.log(name+": all update requests started, resolving");
+      $.when.apply($, reqs).always(function() {
+        console.log(name+": all update requests done, updating chart");
+        chart.update({ duration: 0 });
+      })
+    }, 10000);
 
   }
 
@@ -111,6 +139,7 @@
       var key = urlParams.get('dashboard');
       $.getJSON("/dashboards/"+key, function(data) {
         $('body').append("<h1>"+data.title+"</h1>");
+        console.log("now: "+moment().unix());
         data.graphs.forEach(function(graph) {
           create_graph(
             graph.id,

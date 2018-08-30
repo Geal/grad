@@ -15,6 +15,7 @@ mod metrics;
 mod statsd;
 
 use warp::Filter;
+use warp::http::{Response,StatusCode};
 use std::sync::{Arc,Mutex};
 use std::fmt::Write;
 
@@ -24,27 +25,54 @@ fn main() {
     let _handle = statsd::start(metrics.clone());
 
     let root = warp::index().map(|| {
-        debug!("hello");
         include_str!("../assets/index.html")
     });
 
     let metrics_filter = warp::any().map(move || metrics.clone());
-    let data = warp::path("data").and(warp::path::param())
-      .and(warp::query::<metrics::Query>()).and(metrics_filter.clone()).and_then(send_data);
+    let data = warp::post2().and(warp::path("data"))
+      .and(warp::body::json())
+      .map(|body:metrics::Query| { info!("data: {:?}", body); body})
+      .and(metrics_filter.clone())
+      .and_then(send_data)
 
     let dashboards = warp::path("dashboards").and(warp::fs::dir("./conf"));
 
     let series = warp::path("series").and(metrics_filter).and_then(send_series);
 
-    let routes = warp::get2().and(root.or(data).or(dashboards).or(series));
+    let routes = warp::get2().and(root.or(dashboards).or(series)).or(data);
 
     warp::serve(routes).run(([127, 0, 0, 1], 3000));
 }
 
-fn send_data(key:String, q: metrics::Query, metrics: Arc<Mutex<metrics::Metrics>>) -> Result<impl warp::Reply, warp::Rejection> {
-  match (*metrics.lock().unwrap()).query(&key, &q) {
-    Some(data) => Ok(warp::reply::json(&data)),
-    None       => Err(warp::reject::not_found()),
+fn send_test() -> Result<String, warp::Rejection> {
+  info!("get /test returning 404");
+  Err(warp::reject::not_found())
+}
+
+fn send_data(q: metrics::Query, metrics: Arc<Mutex<metrics::Metrics>>) -> Result<impl warp::Reply, warp::Rejection> {
+  info!("send_data: {:?}", q.key);
+  match (*metrics.lock().unwrap()).query(&q) {
+    Some(data) => {
+      info!("reply ok for {:?}: {:?}", q.key, data);
+      Ok(warp::reply::json(&data))
+    },
+    None       => {
+      error!("reply not found for {:?}", q.key);
+      Ok(warp::reply::json(&metrics::QueryResult {
+        timestamps: Vec::new(),
+        values: Vec::new(),
+      }))
+      //we should be able to reject with a 404
+      //Err(warp::reject::not_found())
+
+      /*
+      let response = Response::builder().status(StatusCode::NOT_FOUND).body(());
+      response..map(map_err(|e| {
+        error!("error building HTTP 404 response: {:?}", e);
+        warp::reject::not_found()
+      })
+      */
+    },
   }
 }
 

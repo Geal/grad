@@ -22,9 +22,9 @@ impl Metrics {
     self.counter += 1;
   }
 
-  pub fn query(&self, key: &str, q: &Query) -> Option<QueryResult> {
-    let since = i64::from(q.since);
-    self.series.get(key).map(|serie| {
+  pub fn query(&self, q: &Query) -> Option<QueryResult> {
+    let since = i64::from(q.range.since);
+    self.series.get(&q.key).map(|serie| {
       let res = serie.values.iter().fold(
         (Vec::new(), Vec::new()),
         |mut res, v| {
@@ -94,9 +94,16 @@ pub struct Value {
   pub value: isize,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Query {
-  since: u32,
+  #[serde(default)]
+  pub range: Range,
+  pub key: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct Range {
+  pub since: u32,
 }
 
 #[derive(Clone,Debug,PartialEq,Serialize,Deserialize)]
