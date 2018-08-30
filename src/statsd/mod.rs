@@ -74,7 +74,7 @@ impl Decoder for StatsdCodec {
     type Error = io::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        info!("got message: '{}'", str::from_utf8(buf).unwrap());
+        trace!("got message: '{}'", str::from_utf8(buf).unwrap());
         //let len = buf.len();
         //buf.split_to(len);
         let (consumed, msg) = match parser::parse(buf) {
