@@ -33,7 +33,7 @@ fn main() {
       .and(warp::body::json())
       .map(|body:metrics::Query| { info!("data: {:?}", body); body})
       .and(metrics_filter.clone())
-      .and_then(send_data)
+      .and_then(send_data);
 
     let dashboards = warp::path("dashboards").and(warp::fs::dir("./conf"));
 

@@ -6,7 +6,11 @@
       "title": "HTTP requests",
       "series": [
         {
-          "key": "sozu.http.requests"
+          "key": "sozu.http.requests",
+          "aggregate": {
+            "points": 10,
+            "function": "sum"
+          }
         },
         {
           "key": "sozu.http.status.2xx"
