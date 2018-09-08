@@ -10,6 +10,7 @@ extern crate bytes;
 extern crate time;
 extern crate serde;
 #[macro_use] extern crate serde_derive;
+#[macro_use] extern crate clap;
 
 mod metrics;
 mod statsd;
@@ -18,11 +19,68 @@ use warp::Filter;
 use warp::http::{Response,StatusCode};
 use std::sync::{Arc,Mutex};
 use std::fmt::Write;
+use std::net::SocketAddr;
+use clap::{App, Arg};
 
 fn main() {
     pretty_env_logger::init();
+    let matches = App::new("Grad")
+        .about(
+            "Aggregate, store, query and visualize your metrics, all in one tool",
+        )
+        .version(crate_version!())
+        .arg(
+            Arg::with_name("config")
+                .short("c")
+                .long("config")
+                .value_name("DIR")
+                .default_value("./conf")
+                .help("Set a custom config directory")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("host")
+                .long("host")
+                .value_name("HOST")
+                .default_value("127.0.0.1")
+                .help("Set host to listen on")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("port")
+                .short("p")
+                .long("port")
+                .value_name("PORT")
+                .default_value("3000")
+                .help("Set a custom port to listen on")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("udp_port")
+                .short("u")
+                .long("udp-port")
+                .value_name("UDP_PORT")
+                .default_value("8125")
+                .help("Set a custom port to listen for metrics on")
+                .takes_value(true),
+        )
+        .get_matches();
+
+    let port = matches.value_of("port").unwrap();
+    let host = matches.value_of("host").unwrap();
+    let udp_port = matches.value_of("udp_port").unwrap();
+    let conf_dir = matches.value_of("config").unwrap();
+
+    let server: SocketAddr = [host, port].join(":").parse().expect(
+        "Unable to parse given server information",
+    );
+
+    let udp_server: SocketAddr = [host, udp_port].join(":").parse().expect(
+        "Unable to parse given server information",
+    );
+
     let metrics = Arc::new(Mutex::new(metrics::Metrics::new()));
-    let _handle = statsd::start(metrics.clone());
+    let _handle = statsd::start(metrics.clone(), udp_server.clone());
 
     let root = warp::index().map(|| {
         include_str!("../assets/index.html")
@@ -35,13 +93,13 @@ fn main() {
       .and(metrics_filter.clone())
       .and_then(send_data);
 
-    let dashboards = warp::path("dashboards").and(warp::fs::dir("./conf"));
+    let dashboards = warp::path("dashboards").and(warp::fs::dir(conf_dir.to_string()));
 
     let series = warp::path("series").and(metrics_filter).and_then(send_series);
 
     let routes = warp::get2().and(root.or(dashboards).or(series)).or(data);
 
-    warp::serve(routes).run(([127, 0, 0, 1], 3000));
+    warp::serve(routes).run((server));
 }
 
 fn send_test() -> Result<String, warp::Rejection> {
