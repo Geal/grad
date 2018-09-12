@@ -40,9 +40,29 @@ impl Metrics {
         },
         AggregateFunction::Sum => {
           let start = Timespec::new(q.range.since as i64, 0);
+          let span = (get_time() - start) / (q.aggregate.points.unwrap_or(1000) as i32);
           let mut agg = SumAggregator::from(
             serie.values.iter(),
-            (get_time() - start) / (q.aggregate.points.unwrap_or(1000) as i32),
+            span,
+            start);
+
+          agg.fold(
+            (Vec::new(), Vec::new()),
+            |mut res, v| {
+              if v.timestamp.sec > since {
+                res.0.push(v.timestamp.sec);
+                res.1.push(v.value);
+              }
+              res
+            }
+          )
+        },
+        AggregateFunction::Mean => {
+          let start = Timespec::new(q.range.since as i64, 0);
+          let span = (get_time() - start) / (q.aggregate.points.unwrap_or(1000) as i32);
+          let mut agg = MeanAggregator::from(
+            serie.values.iter(),
+            span,
             start);
 
           agg.fold(
@@ -149,6 +169,7 @@ impl Default for Aggregate {
 #[serde(rename_all = "lowercase")]
 pub enum AggregateFunction {
   Sum,
+  Mean,
   None,
 }
 
@@ -219,13 +240,16 @@ impl <'a, T: Iterator<Item=&'a Value>> Iterator for SumAggregator<'a, T> {
         }
       } else {
         match self.iterator.next() {
-          None => return Some(Value {
-            timestamp: self.start,
-            tags: Vec::new(),
-            value: self.value.take().unwrap(),
-          }),
+          None => {
+            let value = Value {
+              timestamp: self.start,
+              tags: Vec::new(),
+              value: self.value.take().unwrap(),
+            };
+            info!("sum aggregator, returning {:?}", value);
+            return Some(value);
+          },
           Some(next_val) => {
-            info!("sum aggregator, got {:?}, self.value = {:?}", next_val, self.value);
             if next_val.timestamp > self.next {
               let value = Value {
                 timestamp: self.start,
@@ -248,6 +272,88 @@ impl <'a, T: Iterator<Item=&'a Value>> Iterator for SumAggregator<'a, T> {
     }
   }
 }
+
+pub struct MeanAggregator<'a, T: 'a+Iterator<Item=&'a Value>> {
+  iterator: T,
+  span: Duration,
+  start: Timespec,
+  next: Timespec,
+  value: Option<f64>,
+  count: usize,
+}
+
+impl <'a, T: Iterator<Item=&'a Value>> MeanAggregator<'a, T> {
+  pub fn from(iterator: T, span: Duration, start: Timespec) -> Self {
+    let next = start + span;
+    MeanAggregator {
+      iterator,
+      span,
+      start,
+      next,
+      value: None,
+      count: 0,
+    }
+  }
+}
+
+impl <'a, T: Iterator<Item=&'a Value>> Iterator for MeanAggregator<'a, T> {
+  type Item = Value;
+  fn next(&mut self) -> Option<Self::Item> {
+    loop {
+      if self.value.is_none() {
+        match self.iterator.next() {
+          None => return None,
+          Some(next_val) => {
+            self.value = Some(next_val.value as f64);
+            self.count = 0;
+            if next_val.timestamp > self.next {
+              //FIXME: maybe we're further than next?
+              self.start = next_timestamp(self.start, self.span, next_val.timestamp);
+              self.next = self.start + self.span;
+            }
+          }
+        }
+      } else {
+        match self.iterator.next() {
+          None => {
+            let value = Value {
+              timestamp: self.start,
+              tags: Vec::new(),
+              value: self.value.take().unwrap().round() as isize,
+            };
+            self.count = 0;
+            return Some(value);
+          },
+          Some(next_val) => {
+            if next_val.timestamp > self.next {
+              let value = Value {
+                timestamp: self.start,
+                tags: Vec::new(),
+                value: self.value.take().unwrap().round() as isize,
+              };
+
+              //FIXME: maybe we're further than next?
+              self.start = next_timestamp(self.start, self.span, next_val.timestamp);
+              self.next = self.start + self.span;
+              self.value = Some(next_val.value as f64);
+              self.count = 1;
+              return Some(value);
+            } else {
+              let count = self.count;
+              self.value.as_mut().map(|v| {
+                let old_v = *v;
+                *v = (old_v * count as f64 + next_val.value as f64) / (count + 1) as f64;
+              });
+              self.count += 1;
+            }
+          }
+        }
+
+      }
+    }
+  }
+}
+
 
 #[derive(Clone,Debug,PartialEq,Serialize,Deserialize)]
 pub struct QueryResult {
