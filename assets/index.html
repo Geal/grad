@@ -55,6 +55,9 @@
       var dataLength = data.timestamps.length;
       var should_update = false;
       console.log("loading data for "+query.key);
+      for (var i = chart.data.datasets[index].data.length; i > 0; i--) {
+       chart.data.datasets[index].data.pop();
+      }
       for(var i = 0; i < dataLength; i++) {
         if (typeof data.timestamps[i] !== 'undefined' &&
           typeof data.values[i] !== 'undefined') {
@@ -69,7 +72,7 @@
     });
   }
 
-  function create_graph(id, name, series) {
+  function create_graph(id, name, range, series) {
     $('body').append("<div><h2>"+name+"</h2><canvas id='"+id+"'></canvas></div>");
     var chart = create_chart(id, name);
     chart.update({ duration: 0 });
@@ -78,14 +81,7 @@
     var requests = [];
     console.log("creating graph: "+name);
     for (var index = 0; index < length; index++) {
-      if( !series[index].hasOwnProperty('range') ) {
-        series[index].range = {};
-      }
-      if(!series[index].range.hasOwnProperty('since')) {
-        series[index].range.since = moment().subtract(3, 'hours').unix();
-      } else {
-        series[index].range.since = moment(serie.range.since).unix();
-      }
+      series[index].range = {};
 
       if(typeof chart.data.datasets[index] === 'undefined') {
         chart.data.datasets[index] = {
@@ -101,9 +97,13 @@
       }
 
       console.log(name+": starting request for "+series[index].key);
-      var since = moment().unix();
+
+      if(typeof range === 'undefined' || !range.hasOwnProperty('since')) {
+        series[index].range.since = moment().subtract(3, 'hours').unix();
+      } else {
+        series[index].range.since = moment(range.since).unix();
+      }
       requests.push(load_data(chart, series[index], index));
-      series[index].range.since = since;
     }
 
     console.log(name+": all requests started, resolving");
@@ -118,9 +118,12 @@
       var reqs = [];
       for (var index = 0; index < length; index++) {
         console.log(name+": starting update request for "+series[index].key+", since = ", series[index].range.since);
-        var since = moment().unix();
         reqs.push(load_data(chart, series[index], index));
-        series[index].range.since = since;
+        if(typeof range === 'undefined' || !range.hasOwnProperty('since')) {
+          series[index].range.since = moment().subtract(3, 'hours').unix();
+        //} else {
+        //  series[index].range.since = moment(range.since).unix();
+        }
       }
       console.log(name+": all update requests started, resolving");
       $.when.apply($, reqs).always(function() {
@@ -144,6 +147,7 @@
           create_graph(
             graph.id,
             graph.title,
+            graph.range,
             graph.series
           );
         });
