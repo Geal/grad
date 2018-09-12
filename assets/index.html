@@ -87,7 +87,7 @@
         chart.data.datasets[index] = {
           label: series[index].key,
           fill: false,
-          pointRadius: 0,
+          pointRadius: 3,
           lineTension: 0,
           showLine: true,
           data: [],
@@ -99,7 +99,7 @@
       console.log(name+": starting request for "+series[index].key);
 
       if(typeof range === 'undefined' || !range.hasOwnProperty('since')) {
-        series[index].range.since = moment().subtract(3, 'hours').unix();
+        series[index].range.since = moment().subtract(1, 'hours').unix();
       } else {
         series[index].range.since = moment(range.since).unix();
       }
@@ -120,7 +120,7 @@
         console.log(name+": starting update request for "+series[index].key+", since = ", series[index].range.since);
         reqs.push(load_data(chart, series[index], index));
         if(typeof range === 'undefined' || !range.hasOwnProperty('since')) {
-          series[index].range.since = moment().subtract(3, 'hours').unix();
+          series[index].range.since = moment().subtract(1, 'hours').unix();
         //} else {
         //  series[index].range.since = moment(range.since).unix();
         }
