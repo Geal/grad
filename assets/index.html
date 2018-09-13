@@ -19,6 +19,10 @@
   </head>
   <body>
     <h1>Grad Metrics</h1>
+    <div>
+      <label for="since">Start</label>
+      <input type="datetime-local" id="since" name="since" />
+    </div>
   </body>
 
 <script type="text/javascript">
@@ -117,11 +121,8 @@
 
       console.log(name+": starting request for "+series[index].key);
 
-      if(typeof range === 'undefined' || !range.hasOwnProperty('since')) {
-        series[index].range.since = moment().subtract(3, 'hours').unix();
-      } else {
-        series[index].range.since = moment(range.since).unix();
-      }
+      var since = document.querySelector('#since').value;
+      series[index].range.since = moment(since).unix();
       var key = series[index].key;
       requests.push(load_data(chart, series[index], index).finally(function() {
         console.log("load_data("+key+") done");
@@ -143,11 +144,8 @@
         reqs.push(load_data(chart, series[index], index).finally(function() {
           console.log("load_data("+key+") done");
         }));
-        if(typeof range === 'undefined' || !range.hasOwnProperty('since')) {
-          series[index].range.since = moment().subtract(3, 'hours').unix();
-        //} else {
-        //  series[index].range.since = moment(range.since).unix();
-        }
+        var since = document.querySelector('#since').value;
+        series[index].range.since = moment(since).unix();
       }
       console.log(name+": all update requests started, resolving");
       Promise.all(reqs).then(function() {
@@ -176,6 +174,8 @@
           document.body.appendChild(title);
 
           console.log("now: "+moment().unix());
+          var since = document.querySelector('#since');
+          since.value = moment().subtract(3, 'hours').format("YYYY-MM-DDTHH:mm");
           data.graphs.forEach(function(graph) {
             create_graph(
               graph.id,
