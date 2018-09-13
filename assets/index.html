@@ -3,7 +3,6 @@
     <title>metrics</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment.min.js" integrity="sha256-CutOzxCRucUsn6C6TcEYsauvvYilEniTXldPa6/wu0k=" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.js" integrity="sha256-J2sc79NPV/osLcIpzL3K8uJyAD7T5gaEFKlLDM18oxY=" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
 
   </head>
   <body>
@@ -44,36 +43,46 @@
   }
 
   function load_data(chart, query, index) {
-    return $.ajax({
-      type: "POST",
-      url: "data",
-      data: JSON.stringify(query),
-      dataType: "json",
-      contentType: "application/json"
-    }).then(function(data) {
+    return fetch('/data', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(query)
+    }).then(response => {
+      response.json().then(data => {
+        console.log("loading data for "+query.key);
 
-      var dataLength = data.timestamps.length;
-      var should_update = false;
-      console.log("loading data for "+query.key);
-      for (var i = chart.data.datasets[index].data.length; i > 0; i--) {
-       chart.data.datasets[index].data.pop();
-      }
-      for(var i = 0; i < dataLength; i++) {
-        if (typeof data.timestamps[i] !== 'undefined' &&
-          typeof data.values[i] !== 'undefined') {
-          should_update = true;
-
-          chart.data.datasets[index].data.push({
-            x: moment.unix(data.timestamps[i]).toDate(),
-            y: data.values[i]
-          });
+        var dataLength = data.timestamps.length;
+        var should_update = false;
+        for (var i = chart.data.datasets[index].data.length; i > 0; i--) {
+         chart.data.datasets[index].data.pop();
         }
-      }
+        for(var i = 0; i < dataLength; i++) {
+          if (typeof data.timestamps[i] !== 'undefined' &&
+            typeof data.values[i] !== 'undefined') {
+            should_update = true;
+
+            chart.data.datasets[index].data.push({
+              x: moment.unix(data.timestamps[i]).toDate(),
+              y: data.values[i]
+            });
+          }
+        }
+      })
     });
   }
 
   function create_graph(id, name, range, series) {
-    $('body').append("<div><h2>"+name+"</h2><canvas id='"+id+"'></canvas></div>");
+    var title = document.createElement("h2");
+    title.appendChild(document.createTextNode(name));
+    var div = document.createElement("div");
+    div.appendChild(title);
+    var canvas = document.createElement("canvas");
+    canvas.id = id;
+    div.appendChild(canvas);
+    document.body.appendChild(div);
+
     var chart = create_chart(id, name);
     chart.update({ duration: 0 });
     var index = 0;
@@ -103,11 +112,14 @@
       } else {
         series[index].range.since = moment(range.since).unix();
       }
-      requests.push(load_data(chart, series[index], index));
+      var key = series[index].key;
+      requests.push(load_data(chart, series[index], index).finally(function() {
+        console.log("load_data("+key+") done");
+      }));
     }
 
     console.log(name+": all requests started, resolving");
-    $.when.apply($, requests).always(function() {
+    Promise.all(requests).then(function() {
       console.log(name+": all requests done, updating chart");
       chart.update({ duration: 0 });
     })
@@ -118,7 +130,9 @@
       var reqs = [];
       for (var index = 0; index < length; index++) {
         console.log(name+": starting update request for "+series[index].key+", since = ", series[index].range.since);
-        reqs.push(load_data(chart, series[index], index));
+        reqs.push(load_data(chart, series[index], index).finally(function() {
+          console.log("load_data("+key+") done");
+        }));
         if(typeof range === 'undefined' || !range.hasOwnProperty('since')) {
           series[index].range.since = moment().subtract(3, 'hours').unix();
         //} else {
@@ -126,7 +140,7 @@
         }
       }
       console.log(name+": all update requests started, resolving");
-      $.when.apply($, reqs).always(function() {
+      Promise.all(reqs).then(function() {
         console.log(name+": all update requests done, updating chart");
         chart.update({ duration: 0 });
       })
@@ -140,18 +154,28 @@
       alert("missing dashboard");
     } else {
       var key = urlParams.get('dashboard');
-      $.getJSON("/dashboards/"+key, function(data) {
-        $('body').append("<h1>"+data.title+"</h1>");
-        console.log("now: "+moment().unix());
-        data.graphs.forEach(function(graph) {
-          create_graph(
-            graph.id,
-            graph.title,
-            graph.range,
-            graph.series
-          );
-        });
-      })
+      fetch("/dashboards/"+key, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+      }).then(response => {
+        response.json().then(data => {
+          var title = document.createElement("h1");
+          title.appendChild(document.createTextNode(data.title));
+          document.body.appendChild(title);
+
+          console.log("now: "+moment().unix());
+          data.graphs.forEach(function(graph) {
+            create_graph(
+              graph.id,
+              graph.title,
+              graph.range,
+              graph.series
+            );
+          });
+        })
+      });
     }
   }
 
