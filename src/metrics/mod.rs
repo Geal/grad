@@ -49,10 +49,8 @@ impl Metrics {
           agg.fold(
             (Vec::new(), Vec::new()),
             |mut res, v| {
-              if v.timestamp.sec > since {
-                res.0.push(v.timestamp.sec);
-                res.1.push(v.value);
-              }
+              res.0.push(v.timestamp.sec);
+              res.1.push(v.value);
               res
             }
           )
@@ -68,10 +66,8 @@ impl Metrics {
           agg.fold(
             (Vec::new(), Vec::new()),
             |mut res, v| {
-              if v.timestamp.sec > since {
-                res.0.push(v.timestamp.sec);
-                res.1.push(v.value);
-              }
+              res.0.push(v.timestamp.sec);
+              res.1.push(v.value);
               res
             }
           )
@@ -229,7 +225,6 @@ impl <'a, T: Iterator<Item=&'a Value>> Iterator for SumAggregator<'a, T> {
         match self.iterator.next() {
           None => return None,
           Some(next_val) => {
-            info!("sum aggregator, got {:?}, self.value = {:?}", next_val, self.value);
             self.value = Some(next_val.value);
             if next_val.timestamp > self.next {
               //FIXME: maybe we're further than next?
@@ -246,10 +241,14 @@ impl <'a, T: Iterator<Item=&'a Value>> Iterator for SumAggregator<'a, T> {
               tags: Vec::new(),
               value: self.value.take().unwrap(),
             };
-            info!("sum aggregator, returning {:?}", value);
             return Some(value);
           },
           Some(next_val) => {
+            if next_val.timestamp < self.start {
+              debug!("sumagg skipping value at timestamp {:?}", next_val.timestamp);
+              continue;
+            }
+
             if next_val.timestamp > self.next {
               let value = Value {
                 timestamp: self.start,
@@ -325,6 +324,11 @@ impl <'a, T: Iterator<Item=&'a Value>> Iterator for MeanAggregator<'a, T> {
             return Some(value);
           },
           Some(next_val) => {
+            if next_val.timestamp < self.start {
+              debug!("meanagg skipping value at timestamp {:?}", next_val.timestamp);
+              continue;
+            }
+
             if next_val.timestamp > self.next {
               let value = Value {
                 timestamp: self.start,
