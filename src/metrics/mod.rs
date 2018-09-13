@@ -210,7 +210,7 @@ impl <'a, T: Iterator<Item=&'a Value>> SumAggregator<'a, T> {
 }
 
 fn next_timestamp(mut start: Timespec, span: Duration, current: Timespec) -> Timespec {
-  while start < current {
+  while start + span < current {
     start = start + span;
   }
 
