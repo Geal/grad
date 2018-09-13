@@ -8,14 +8,15 @@ use tokio::net::{UdpFramed, UdpSocket};
 use tokio::prelude::*;
 use tokio_io::codec::Decoder;
 use nom::Offset;
+use std::net::SocketAddr;
 
 use super::metrics;
 
 mod parser;
 
-pub fn start(metrics: Arc<Mutex<metrics::Metrics>>) -> JoinHandle<()> {
+pub fn start(metrics: Arc<Mutex<metrics::Metrics>>, addr: SocketAddr) -> JoinHandle<()> {
     thread::spawn(move || {
-        let socket = UdpSocket::bind(&"0.0.0.0:8125".parse().unwrap()).unwrap();
+        let socket = UdpSocket::bind(&addr).unwrap();
         let stream = UdpFramed::new(socket, StatsdCodec::new());
 
         let server = stream
