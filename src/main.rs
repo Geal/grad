@@ -39,45 +39,30 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("host")
-                .long("host")
-                .value_name("HOST")
-                .default_value("127.0.0.1")
-                .help("Set host to listen on")
+            Arg::with_name("http")
+                .long("http")
+                .value_name("HTTP address")
+                .default_value("127.0.0.1:3000")
+                .help("Set HTTP address to listen on (format: IP:port)")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("port")
-                .short("p")
-                .long("port")
-                .value_name("PORT")
-                .default_value("3000")
-                .help("Set a custom port to listen on")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("udp_port")
-                .short("u")
-                .long("udp-port")
-                .value_name("UDP_PORT")
-                .default_value("8125")
-                .help("Set a custom port to listen for metrics on")
+            Arg::with_name("statsd")
+                .long("statsd")
+                .value_name("STATSD address")
+                .default_value("127.0.0.1:8125")
+                .help("Set UDP address to listen on (format: IP:port)")
                 .takes_value(true),
         )
         .get_matches();
 
-    let port = matches.value_of("port").unwrap();
-    let host = matches.value_of("host").unwrap();
-    let udp_port = matches.value_of("udp_port").unwrap();
+    let server:SocketAddr = matches.value_of("http").unwrap().parse().expect(
+        "Unable to parse given server information",
+    );
+    let udp_server:SocketAddr = matches.value_of("statsd").unwrap().parse().expect(
+        "Unable to parse given server information",
+    );
     let conf_dir = matches.value_of("config").unwrap();
-
-    let server: SocketAddr = [host, port].join(":").parse().expect(
-        "Unable to parse given server information",
-    );
-
-    let udp_server: SocketAddr = [host, udp_port].join(":").parse().expect(
-        "Unable to parse given server information",
-    );
 
     let metrics = Arc::new(Mutex::new(metrics::Metrics::new()));
     let _handle = statsd::start(metrics.clone(), udp_server.clone());
